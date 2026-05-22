@@ -295,6 +295,7 @@ class wsiHandler:
             #url文件名:/data/5cf58b__CMWGTUhghiTnTpwd.jpg?d=home/mdi/.cache/label-studio;
             #本地文件名:/home/mdi/.cache/label-studio/5cf58b__CMWGTUhghiTnTpwd.jpg
             #保存在本地，本地文件名:原文件名+时间戳(ms)
+            os.makedirs(CONFIG.local_storage, exist_ok=True)
             slice_image.save(local_slice_filename)
         url_slice_filename = "/data/" + slice_filename + '?d=' + CONFIG.local_storage
 
