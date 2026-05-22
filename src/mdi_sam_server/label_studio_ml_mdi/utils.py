@@ -520,6 +520,66 @@ class wsiHandler:
                 break
         return level
 
+def cleanup_local_storage(max_age_hours: float = None) -> dict:
+    """
+    删除 LOCAL_STORAGE 目录下超过 max_age_hours 小时未被访问的缓存文件。
+
+    返回统计信息: {'deleted': int, 'failed': int, 'total_bytes': int}
+    """
+    if max_age_hours is None:
+        max_age_hours = CONFIG.cache_max_age_hours
+
+    storage_dir = CONFIG.local_storage
+    if not storage_dir or not os.path.isdir(storage_dir):
+        logger.warning(f"cleanup_local_storage: directory not found: {storage_dir}")
+        return {'deleted': 0, 'failed': 0, 'total_bytes': 0}
+
+    cutoff = time.time() - max_age_hours * 3600
+    deleted = failed = total_bytes = 0
+
+    for filename in os.listdir(storage_dir):
+        filepath = os.path.join(storage_dir, filename)
+        if not os.path.isfile(filepath):
+            continue
+        try:
+            stat = os.stat(filepath)
+            if stat.st_atime < cutoff:
+                total_bytes += stat.st_size
+                os.remove(filepath)
+                deleted += 1
+                logger.debug(f"cleanup: removed {filepath}")
+        except Exception as e:
+            logger.warning(f"cleanup: failed to remove {filepath}: {e}")
+            failed += 1
+
+    logger.info(
+        f"cleanup_local_storage done: deleted={deleted}, failed={failed}, "
+        f"freed={total_bytes / 1024 / 1024:.2f} MB, max_age={max_age_hours}h"
+    )
+    return {'deleted': deleted, 'failed': failed, 'total_bytes': total_bytes}
+
+
+def start_cache_cleanup_scheduler():
+    """在后台线程中按 CACHE_CLEAN_INTERVAL_HOURS 间隔定期清理缓存目录。"""
+    interval_seconds = CONFIG.cache_clean_interval_hours * 3600
+
+    def _run():
+        logger.info(
+            f"Cache cleanup scheduler started: interval={CONFIG.cache_clean_interval_hours}h, "
+            f"max_age={CONFIG.cache_max_age_hours}h, dir={CONFIG.local_storage}"
+        )
+        while True:
+            time.sleep(interval_seconds)
+            try:
+                cleanup_local_storage()
+            except Exception as e:
+                logger.error(f"Cache cleanup error: {e}", exc_info=True)
+
+    t = threading.Thread(target=_run, daemon=True, name="cache-cleanup")
+    t.start()
+    return t
+
+
 if __name__ == "__main__":
     c = InMemoryLRUDictCache(2)
     c.put(1, 1)

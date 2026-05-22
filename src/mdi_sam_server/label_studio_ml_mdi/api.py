@@ -5,7 +5,7 @@ from flask_cors import CORS
 
 from .model import LabelStudioMLBase
 from .exceptions import exception_handler
-from .utils import wsiHandler,cost_time
+from .utils import wsiHandler, cost_time, start_cache_cleanup_scheduler
 
 logger = logging.getLogger(__name__)
 #logger.setLevel(logging.DEBUG)
@@ -34,6 +34,7 @@ def init_app(model_class):
     return _server
 
 wsi_handler = wsiHandler()
+start_cache_cleanup_scheduler()
 
 @_server.route('/api/predict', methods=['POST'])
 @exception_handler
