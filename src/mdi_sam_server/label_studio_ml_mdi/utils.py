@@ -233,9 +233,13 @@ class wsiHandler:
         local_slice_filename = os.path.join(CONFIG.local_storage, slice_filename)
 
         if os.path.exists(local_slice_filename):
-            logger.info(f"local storage exist slide:{local_slice_filename}")
-            local_slide_exist = True #本地已存在该slide 
-        
+            # 缓存命中：直接从文件读取尺寸，跳过所有瓦片下载，节省网络 I/O
+            with Image.open(local_slice_filename) as cached_img:
+                slice_width, slice_height = cached_img.size
+            url_slice_filename = "/data/" + slice_filename + '?d=' + CONFIG.local_storage
+            logger.info(f"cache hit, skip download: {local_slice_filename} [{slice_width}x{slice_height}]")
+            return url_slice_filename, slice_width, slice_height
+
         for item in point_list:
             logger.debug(f"prefix_url:{prefix_url}")
             tile_url = prefix_url + '/' + str(url_layer) + '/' + str(item[0]) + '/' + str(item[1])
@@ -253,7 +257,7 @@ class wsiHandler:
                     file_name       : True
                 }
             )
-        #download_images(image_url_list)
+
         tasks = []
         logger.debug(f"image_url_list:{image_url_list}")
         start_time = time.time()
@@ -283,20 +287,14 @@ class wsiHandler:
         logger.debug(f"new slice size:[{slice_width},{slice_height}]")
 
         slice_image = Image.new('RGB', (slice_width, slice_height), ImageColor.getrgb("white"))
-        logger.debug(f"image_url_list:{image_url_list}")
 
-        #本地不存在则拼接出该slide
-        if not local_slide_exist:
-            for item, image in enumerate(image_url_list):
-                slice_x = int(item % slice_size_num[0] * tile_size[0])
-                slice_y = int(item // slice_size_num[0] * tile_size[1])
-                slice_image.paste(image["content"], (slice_x, slice_y))
-            
-            #url文件名:/data/5cf58b__CMWGTUhghiTnTpwd.jpg?d=home/mdi/.cache/label-studio;
-            #本地文件名:/home/mdi/.cache/label-studio/5cf58b__CMWGTUhghiTnTpwd.jpg
-            #保存在本地，本地文件名:原文件名+时间戳(ms)
-            os.makedirs(CONFIG.local_storage, exist_ok=True)
-            slice_image.save(local_slice_filename)
+        for item, image in enumerate(image_url_list):
+            slice_x = int(item % slice_size_num[0] * tile_size[0])
+            slice_y = int(item // slice_size_num[0] * tile_size[1])
+            slice_image.paste(image["content"], (slice_x, slice_y))
+
+        os.makedirs(CONFIG.local_storage, exist_ok=True)
+        slice_image.save(local_slice_filename)
         url_slice_filename = "/data/" + slice_filename + '?d=' + CONFIG.local_storage
 
         return url_slice_filename, slice_width, slice_height
@@ -411,7 +409,9 @@ class wsiHandler:
         image_info = self.get_cache_urlInfo(image_info_url)
 
         #计算layer位置
-        cur_scale        = context['cur_scale']
+        cur_scale        = context.get('cur_scale')
+        if cur_scale is None:
+            raise ValueError("svs_handler: context 缺少 'cur_scale' 字段")
         layer_size       = image_info['basisInfo']['layerSize']
         tile_width       = int(image_info['basisInfo']['tileWidth'])
         tile_height      = int(image_info['basisInfo']['tileHeight'])
@@ -426,7 +426,7 @@ class wsiHandler:
         current_layer_sliceY = current_layer_info['sliceNumY']
         current_layer_width  = current_layer_info['sliceWidth']
         current_layer_height = current_layer_info['sliceHeight']
-        logger.debug("current_layer_info:",current_layer_info)
+        logger.debug(f"current_layer_info: {current_layer_info}")
         
         #获取rectangle prompt信息
         rectangle_data = None

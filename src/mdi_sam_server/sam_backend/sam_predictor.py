@@ -1,5 +1,8 @@
 import os
 import logging
+import queue
+import threading
+from contextlib import contextmanager
 import torch
 import cv2
 import numpy as np
@@ -26,7 +29,7 @@ SAM_DRAW_MODE=os.environ.get("SAM_DRAW_MODE",False)
 
 class SAMPredictor(object):
 
-    def __init__(self, model_choice):
+    def __init__(self, model_choice, device: str = None):
         self.model_choice = model_choice
 
         # cache for embeddings
@@ -34,11 +37,14 @@ class SAMPredictor(object):
         #   since predictor.set_image() should be called each time the new image comes
         #   before making predictions
         #   to extend it to >1 image, we need to store the "active image" state in the cache
-        #self.cache = InMemoryLRUDictCache(1)
         self.cache = InMemoryLRUDictCache(1)
 
-        # if you're not using CUDA, use "cpu" instead .... good luck not burning your computer lol
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        # 每个实例独立运行在指定设备上，PredictorPool 保证同一时刻只有一个线程持有此实例，
+        # 因此不需要内部 Lock。
+        if device is not None:
+            self.device = device
+        else:
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
         logger.debug(f"Using device {self.device}")
 
         if model_choice == 'ONNX':
@@ -240,7 +246,7 @@ class SAMPredictor(object):
     ):
         if self.model_choice == 'ONNX':
             return self.predict_onnx(img_path, point_coords, point_labels, input_box)
-        elif self.model_choice in ('SAM', 'MobileSAM','SAM2'):
+        elif self.model_choice in ('SAM', 'MobileSAM', 'SAM2'):
             return self.predict_sam(img_path, point_coords, point_labels, input_box)
         else:
             raise NotImplementedError(f"Model choice {self.model_choice} is not supported yet")
@@ -293,6 +299,62 @@ class SAMPredictor(object):
 
         plt.savefig(f"../draw_image/mask_{id}")
 
+
+
+class PredictorPool:
+    """
+    固定大小的 SAMPredictor 实例池，支持多 GPU 并行推理。
+
+    工作原理：
+    - 启动时按 pool_size 创建 N 个 SAMPredictor，按 round-robin 分配到各 GPU。
+    - 请求通过 acquire() 从池中取出一个空闲实例（若全忙则阻塞等待）。
+    - 推理完成后 contextmanager 自动归还，下一个等待请求立即获得它。
+    - 每个实例状态完全独立，无需 Lock，真正并行。
+
+    单 GPU 场景：
+    - 多实例在同一 GPU 上，现代显卡（A100/H100）通常能容纳 2-4 个 SAM2 实例。
+    - 当一个实例在做 encode（GPU 密集），另一个可同时完成 I/O + decode（GPU 利用率更高）。
+
+    多 GPU 场景：
+    - pool_size >= gpu_count 时每个 GPU 至少分配 1 个实例，实现真正的跨设备并行。
+    """
+
+    def __init__(self, model_choice: str, pool_size: int):
+        gpu_count = torch.cuda.device_count()
+        logger.info(f"PredictorPool: pool_size={pool_size}, visible_gpus={gpu_count}")
+
+        self._pool: queue.Queue = queue.Queue()
+        self._model_name: str = ""
+
+        for i in range(pool_size):
+            if gpu_count > 0:
+                device = f"cuda:{i % gpu_count}"
+            else:
+                device = "cpu"
+            logger.info(f"  Loading predictor [{i}] on {device} ...")
+            predictor = SAMPredictor(model_choice, device=device)
+            if i == 0:
+                self._model_name = predictor.model_name
+            self._pool.put(predictor)
+
+        logger.info(f"PredictorPool ready: {pool_size} instance(s), model={self._model_name}")
+
+    @contextmanager
+    def acquire(self):
+        """从池中取出一个空闲 predictor，用完后自动归还。"""
+        predictor = self._pool.get()
+        try:
+            yield predictor
+        finally:
+            self._pool.put(predictor)
+
+    @property
+    def model_name(self) -> str:
+        return self._model_name
+
+    @property
+    def size(self) -> int:
+        return self._pool.qsize()
 
 
 if __name__ == "__main__":

@@ -3,12 +3,15 @@ import os
 from label_studio_converter import brush
 from typing import List, Dict, Optional
 from uuid import uuid4
-from .sam_predictor import SAMPredictor
+from .sam_predictor import PredictorPool
 from mdi_sam_server.label_studio_ml_mdi.model import LabelStudioMLBase
 
-#SAM_CHOICE = os.environ.get("SAM_CHOICE", "MobileSAM")  # other option is just SAM
-SAM_CHOICE = os.environ.get("SAM_CHOICE", "SAM")  # other option is just SAM
-PREDICTOR = SAMPredictor(SAM_CHOICE)
+SAM_CHOICE = os.environ.get("SAM_CHOICE", "SAM")
+# 实例池大小：建议设置为 GPU 数量（多 GPU 并行）或单 GPU 上允许同时加载的模型副本数。
+# 每增加 1 个实例约多占一份模型显存（SAM2-base+ ~2-4 GB VRAM）。
+POOL_SIZE = int(os.environ.get("PREDICTOR_POOL_SIZE", "1"))
+
+PREDICTOR_POOL = PredictorPool(SAM_CHOICE, pool_size=POOL_SIZE)
 
 
 class SamMLBackend(LabelStudioMLBase):
@@ -45,12 +48,13 @@ class SamMLBackend(LabelStudioMLBase):
         #print(f'Point coords are {point_coords}, point labels are {point_labels}, input box is {input_box}')
 
         img_path = tasks[0]['data']['image']
-        predictor_results = PREDICTOR.predict(
-            img_path=img_path,
-            point_coords=point_coords or None,
-            point_labels=point_labels or None,
-            input_box=input_box
-        )
+        with PREDICTOR_POOL.acquire() as predictor:
+            predictor_results = predictor.predict(
+                img_path=img_path,
+                point_coords=point_coords or None,
+                point_labels=point_labels or None,
+                input_box=input_box
+            )
 
         predictions = self.get_results(
             masks=predictor_results['masks'],
@@ -91,13 +95,14 @@ class SamMLBackend(LabelStudioMLBase):
 
         return [{
             'result': results,
-            'model_version': PREDICTOR.model_name
+            'model_version': PREDICTOR_POOL.model_name
         }]
-    
+
     def preload(self, url):
         if url:
             try:
-                PREDICTOR.set_image(url, calculate_embeddings=False)
+                with PREDICTOR_POOL.acquire() as predictor:
+                    predictor.set_image(url, calculate_embeddings=False)
             except Exception as err:
                 print(f'error info :{err}')
                 raise Exception(f"error info: preload faild!")
