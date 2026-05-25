@@ -27,7 +27,8 @@ RUN conda tos accept --override-channels --channel https://repo.anaconda.com/pkg
 ENV PATH=$CONDA_DIR/envs/app/bin:$PATH
 
 RUN python -m pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple \
-    && python -m pip --no-cache-dir install --upgrade pip
+    && python -m pip --no-cache-dir install --upgrade pip \
+    && python -m pip --no-cache-dir install "setuptools<81"
 
 WORKDIR /app
 
@@ -37,7 +38,8 @@ COPY pyproject.toml .
 RUN mkdir -p src/mdi_sam_server \
     && touch src/mdi_sam_server/__init__.py \
     && pip install -e . \
-    && rm -rf src/mdi_sam_server/__init__.py
+    && rm -rf src/mdi_sam_server/__init__.py \
+    && pip install "setuptools<81"
 
 # ── 源码层（代码变更只重跑这一层，依赖层缓存命中）────────────────────────
 COPY . .

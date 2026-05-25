@@ -11,7 +11,10 @@ _PRE_THREADS=${GUNICORN_THREADS:-}
 _PRE_TIMEOUT=${GUNICORN_TIMEOUT:-}
 _PRE_POOL=${PREDICTOR_POOL_SIZE:-}
 
-source ./.env
+# .env 可选：容器部署时建议通过 --env-file 注入，本地开发时使用仓库根目录的 .env
+if [ -f ./.env ]; then
+    source ./.env
+fi
 
 # 恢复调用方传入的值（非空则覆盖 .env 中的同名变量）
 [ -n "$_PRE_SERVER_PORT" ] && SERVER_PORT=$_PRE_SERVER_PORT

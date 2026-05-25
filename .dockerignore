@@ -17,3 +17,6 @@ logs
 *.pth
 *.onnx
 models/*
+.env
+.git
+tests/
