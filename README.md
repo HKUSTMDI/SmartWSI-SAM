@@ -49,10 +49,6 @@ MDI annotation platform real-time segmentation server powered by [SAM1](https://
 
 The end-to-end framework — from user prompts on the WSI viewer to the returned segmentation mask — is organized into four layers: **User Interaction → API Gateway → WSI Tile Processing → SAM Inference**.
 
-<p align="center">
-  <img src="./demo/Structure.png" alt="WSI Real-Time SAM Segmentation Framework" width="70%" />
-</p>
-
 The core of WSI support is the tile-processing algorithm: selecting the right pyramid layer, mapping the prompt box to a tile grid, downloading and stitching tiles, and back-transforming coordinates into the stitched slice.
 
 <p align="center">
