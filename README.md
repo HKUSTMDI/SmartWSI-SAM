@@ -2,7 +2,7 @@
 
 **[Medical Data Intelligence Lab](https://mdi.hkust-gz.edu.cn/)**  ·  [Cheng ZHANG](https://zachczhang.github.io/)
 
-![architecture](./docs/architecture.jpg)
+![architecture](./demo/architecture.jpg)
 
 MDI annotation platform real-time segmentation server powered by [SAM1](https://github.com/facebookresearch/segment-anything) & [SAM2](https://github.com/facebookresearch/segment-anything-2). Generate masks from point / box prompts on both standard images and Whole Slide Images (WSI). Can be used directly as a **Label Studio** ML backend.
 
@@ -21,17 +21,17 @@ MDI annotation platform real-time segmentation server powered by [SAM1](https://
 ### WSI Segmentation
 
 <div>
-<img src="./docs/demo1.gif" width="50%"/><img src="./docs/demo2.gif" width="50%"/>
+<img src="./demo/demo1.gif" width="50%"/><img src="./demo/demo2.gif" width="50%"/>
 </div>
 
 ### Point & Rectangle Mode
 
 <p float="left">
-  <img src="./docs/demo_point1.jpg" width="37%" />
-  <img src="./docs/demo_point2.jpg" width="37%" />
+  <img src="./demo/demo_point1.jpg" width="37%" />
+  <img src="./demo/demo_point2.jpg" width="37%" />
   <br/>
-  <img src="./docs/demo_rectangle1.jpg" width="37%" />
-  <img src="./docs/demo_rectangle2.jpg" width="37%" />
+  <img src="./demo/demo_rectangle1.jpg" width="37%" />
+  <img src="./demo/demo_rectangle2.jpg" width="37%" />
 </p>
 
 ### Supported Models
@@ -42,6 +42,24 @@ MDI annotation platform real-time segmentation server powered by [SAM1](https://
 | 2 | [Meta SAM2](https://github.com/facebookresearch/segment-anything-2) | **Recommended** |
 | 3 | [MobileSAM](https://github.com/ChaoningZhang/MobileSAM) | Lightweight |
 | 4 | ONNX | CPU-friendly |
+
+---
+
+## Architecture & How It Works
+
+The end-to-end framework — from user prompts on the WSI viewer to the returned segmentation mask — is organized into four layers: **User Interaction → API Gateway → WSI Tile Processing → SAM Inference**.
+
+<p align="center">
+  <img src="./demo/Structure.png" alt="WSI Real-Time SAM Segmentation Framework" width="70%" />
+</p>
+
+The core of WSI support is the tile-processing algorithm: selecting the right pyramid layer, mapping the prompt box to a tile grid, downloading and stitching tiles, and back-transforming coordinates into the stitched slice.
+
+<p align="center">
+  <img src="./demo/WSI_slice.png" alt="WSI Tile Processing Algorithm Detail" width="100%" />
+</p>
+
+📖 **Full technical documentation:** [English](./docs/wsi-sam-segmentation-en.md) · [中文](./docs/wsi-sam-segmentation.md)
 
 ---
 

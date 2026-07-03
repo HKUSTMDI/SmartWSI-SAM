@@ -1,4 +1,7 @@
 # 接口文档
+
+> 📚 **相关文档**：[项目主页 (README)](../README.md) · WSI SAM 分割技术文档 [中文](./wsi-sam-segmentation.md) · [English](./wsi-sam-segmentation-en.md)
+
 + 说明:请求体采用json方式，请求头中包含token进行验证 
 请求头:Content-Type:application/json;token:xxxx
 ## 接口列表:
@@ -241,7 +244,7 @@ Content-Type:application/json;token:test
 
 + 效果:
 <p float="left">
-  <img src="./demo_point2.jpg" width="37.25%" />
+  <img src="../demo/demo_point2.jpg" width="37.25%" />
 </p>
 
 #### 2.rectangle prompt
@@ -323,7 +326,7 @@ Content-Type:application/json;token:test
 
 效果图
 <p float="left">
-  <img src="./demo_rectangle2.jpg" width="37.25%" float='left'/>
+  <img src="../demo/demo_rectangle2.jpg" width="37.25%" float='left'/>
 </p>
 
 ### 3.wsi predict方式:
@@ -451,7 +454,7 @@ Content-Type:application/json;token:test
 ```
 + 效果图
 <p float="left">
-  <img src="./wsgi_demo5.png" width="37.25%" float='left'/>
+  <img src="../demo/wsgi_demo5.png" width="37.25%" float='left'/>
 </p>
 
 ## preload 
